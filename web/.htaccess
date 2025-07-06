@@ -8,3 +8,30 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# ----------------------------------------------------------------------
+# Performance optimizations: compression & caching
+# ----------------------------------------------------------------------
+
+# Enable gzip/deflate compression
+<IfModule mod_deflate.c>
+    # Compress HTML, CSS, JavaScript, Text, XML and fonts
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/x-javascript application/xml application/json image/svg+xml
+
+    # Remove unnecessary caches for proxies
+    Header append Vary Accept-Encoding
+</IfModule>
+
+# Leverage browser caching for static assets
+<IfModule mod_expires.c>
+    ExpiresActive On
+    # 1 year expiry for versioned assets
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType application/x-javascript "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/x-icon "access plus 1 year"
+</IfModule>

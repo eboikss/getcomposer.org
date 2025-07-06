@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+        <title>{% block title %}Composer{% endblock %}</title>
+        <meta name="description" content="Dependency Management for PHP">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+
+        {# Preload critical resources #}
+        <link rel="preload" href="{{ app.request.basePath }}/css/app.min.css?v=11" as="style">
+        <link rel="preload" href="{{ app.request.basePath }}/js/app.min.js?v=11" as="script">
+
+        {# Critical CSS inlined for faster rendering #}
+        <style>
+            /* Critical CSS - Above the fold styles */
+            body{margin:0;font-size:13px;line-height:1.231;font-family:sans-serif;color:#222}
+            #main,header{margin:auto;max-width:980px;margin-bottom:30px;font-size:16px;line-height:150%}
+            a,a:link,a:visited,a:hover{text-decoration:none;color:#44f}
+            header{font-size:23px;margin-top:20px;margin-bottom:40px}
+            header a{margin:0 8px 0 0;padding:0 8px 0 0;display:inline-block;border-right:1px solid #ccc}
+            header a.last{border:0}header a.active{color:#000}
+            .logo{text-align:center}
+            h1{font-weight:normal;font-size:30px;line-height:130%}
+        </style>
+
+        {# Load full CSS asynchronously #}
+        <link rel="preload" href="{{ app.request.basePath }}/css/app.min.css?v=11" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript><link rel="stylesheet" href="{{ app.request.basePath }}/css/app.min.css?v=11"></noscript>
+
+        {# Preconnect to external domains #}
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+        <link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
+
+        {# DNS prefetch for external resources #}
+        <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
+        <link rel="dns-prefetch" href="//www.google-analytics.com">
+
+        {# Load Modernizr inline (critical for feature detection) #}
+        <script>
+            /* Modernizr 2.0.6 - Inline critical parts */
+            window.Modernizr=function(a,b,c){var d={},e=b.documentElement;e.className=e.className.replace(/(^|\s)no-js(\s|$)/,'$1$2')+((' js'));return d}(this,this.document);
+        </script>
+    </head>
+
+    <body>
+        <div id="container">
+            <header>
+                {% block header %}
+                {% spaceless %}
+                    <a href="{{ path('home') }}">Home</a>
+                    <a class="{{ page == 'getting-started' ? 'active':'' }}" href="{{ path('docs.view', {page: '00-intro.md'}) }}">Getting Started</a>
+                    <a class="{{ page == 'download' ? 'active':'' }}" href="{{ path('download') }}">Download</a>
+                    <a class="{{ page == 'docs' ? 'active':'' }}" href="{{ path('docs') }}">Documentation</a>
+                    <a class="last" href="https://packagist.org/">Browse Packages</a>
+                {% endspaceless %}
+                {% endblock %}
+            </header>
+            <div id="main" role="main">
+                {% block content %}
+                {% endblock %}
+            </div>
+            <footer>
+                {% block footer %}
+                {% endblock %}
+
+                <p class="license">Composer and all content on this site are released under the <a href="https://github.com/composer/composer/blob/master/LICENSE">MIT license</a>.</p>
+            </footer>
+        </div>
+
+        {# Load combined JS bundle #}
+        <script src="{{ app.request.basePath }}/js/app.min.js?v=11" defer></script>
+
+        {# Load external resources asynchronously #}
+        <script>
+            // Async load DocSearch CSS
+            var docSearchCSS = document.createElement('link');
+            docSearchCSS.rel = 'stylesheet';
+            docSearchCSS.href = 'https://cdn.jsdelivr.net/docsearch.js/2/docsearch.min.css';
+            document.head.appendChild(docSearchCSS);
+
+            // Async load and initialize Google Analytics
+            window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+            ga('create', 'UA-26723099-2', 'auto');
+            ga('send', 'pageview');
+            
+            // Load GA script asynchronously
+            var gaScript = document.createElement('script');
+            gaScript.async = true;
+            gaScript.src = 'https://www.google-analytics.com/analytics.js';
+            document.head.appendChild(gaScript);
+
+            // Load DocSearch after page load
+            window.addEventListener('load', function() {
+                var docSearchScript = document.createElement('script');
+                docSearchScript.src = 'https://cdn.jsdelivr.net/docsearch.js/2/docsearch.min.js';
+                docSearchScript.onload = function() {
+                    if (document.getElementById('docsearch')) {
+                        docsearch({
+                            apiKey: '8f77725b2f2db4166675acc6e8ea3526',
+                            indexName: 'getcomposer',
+                            inputSelector: '#docsearch',
+                            queryHook: function (query) {
+                                var parts = query.split(' ');
+                                parts = parts.map(function (part, index) {
+                                    var word = part.trim();
+                                    // quote --foo args so they are not parsed as negations
+                                    if (word.length >= 2 && word[0] === '-' && word[1] === '-') {
+                                        word = '"' + word + (index === parts.length-1 ? '' : '"');
+                                    }
+                                    // quote -x args
+                                    if (word.length == 2 && word[0] === '-') {
+                                        word = '"' + word + (index === parts.length-1 ? '' : '"');
+                                    }
+                                    return word;
+                                });
+                                return parts.join(' ');
+                            },
+                            debug: false
+                        });
+                    }
+                };
+                document.head.appendChild(docSearchScript);
+            });
+        </script>
+
+        {# Service Worker for caching (Progressive Web App features) #}
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                        console.log('SW registered: ', registration);
+                    }).catch(function(registrationError) {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+                });
+            }
+        </script>
+    </body>
+</html>

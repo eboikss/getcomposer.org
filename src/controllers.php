@@ -5,6 +5,9 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 
+// Include CacheService
+require_once __DIR__ . '/services/CacheService.php';
+
 $app->before(function (Request $req) {
     if (!class_exists('Tideways\Profiler')) {
         return;
@@ -18,47 +21,72 @@ $app->before(function (Request $req) {
 }, 8);
 
 $app->get('/', function () use ($app) {
-    $logos = glob(__DIR__.'/../web/img/logo-composer-transparent*.png');
-    $logo = basename($logos[array_rand($logos)]);
+    $cache = new CacheService();
+    
+    // Cache logo selection (changes only when new logos are added)
+    $logo = $cache->rememberDirectory('homepage_logo', __DIR__.'/../web/img', function() {
+        $logos = glob(__DIR__.'/../web/img/logo-composer-transparent*.png');
+        return basename($logos[array_rand($logos)]);
+    }, 86400); // Cache for 24 hours
 
-    $versions = array();
-    foreach (glob(__DIR__.'/../web/download/*', GLOB_ONLYDIR) as $version) {
-        $versions[] = basename($version);
-    }
-    usort($versions, 'version_compare');
-    $versions = array_reverse($versions);
-
-    foreach ($versions as $version) {
-        if (strpos($version, '-') === false) {
-            $latestStable = $version;
-            break;
+    // Cache version information (changes only when new versions are released)
+    $latestStable = $cache->rememberDirectory('latest_stable_version', __DIR__.'/../web/download', function() {
+        $versions = array();
+        foreach (glob(__DIR__.'/../web/download/*', GLOB_ONLYDIR) as $version) {
+            $versions[] = basename($version);
         }
-    }
+        usort($versions, 'version_compare');
+        $versions = array_reverse($versions);
+
+        foreach ($versions as $version) {
+            if (strpos($version, '-') === false) {
+                return $version;
+            }
+        }
+        return null;
+    }, 3600); // Cache for 1 hour
 
     return $app['twig']->render('index.html.twig', array('logo' => $logo, 'latestStable' => $latestStable));
 })
 ->bind('home');
 
 $app->get('/download/', function () use ($app) {
-    $versions = array();
-    foreach (glob(__DIR__.'/../web/download/*', GLOB_ONLYDIR) as $version) {
-        $versions[basename($version)] = ['date' => new \DateTime('@'.filemtime($version.'/composer.phar')), 'sha256sum' => preg_replace('{^(\S+).*}', '$1', file_get_contents($version.'/composer.phar.sha256sum'))];
-    }
-
-    uksort($versions, 'version_compare');
-    $versions = array_reverse($versions);
-
-    foreach ($versions as $version => $versionMeta) {
-        if (strpos($version, '-') === false) {
-            $latestStable = $version;
-            break;
+    $cache = new CacheService();
+    
+    // Cache version data (expensive filesystem operations)
+    $versionsData = $cache->rememberDirectory('download_versions', __DIR__.'/../web/download', function() {
+        $versions = array();
+        foreach (glob(__DIR__.'/../web/download/*', GLOB_ONLYDIR) as $version) {
+            $versionName = basename($version);
+            $pharFile = $version.'/composer.phar';
+            $checksumFile = $version.'/composer.phar.sha256sum';
+            
+            if (file_exists($pharFile) && file_exists($checksumFile)) {
+                $versions[$versionName] = [
+                    'date' => new \DateTime('@'.filemtime($pharFile)), 
+                    'sha256sum' => preg_replace('{^(\S+).*}', '$1', file_get_contents($checksumFile))
+                ];
+            }
         }
-    }
+
+        uksort($versions, 'version_compare');
+        $versions = array_reverse($versions);
+
+        $latestStable = null;
+        foreach ($versions as $version => $versionMeta) {
+            if (strpos($version, '-') === false) {
+                $latestStable = $version;
+                break;
+            }
+        }
+        
+        return ['versions' => $versions, 'latestStable' => $latestStable];
+    }, 3600); // Cache for 1 hour
 
     $data = array(
         'page' => 'download',
-        'versions' => $versions,
-        'latestStable' => $latestStable,
+        'versions' => $versionsData['versions'],
+        'latestStable' => $versionsData['latestStable'],
         'windows' => false !== strpos($app['request']->headers->get('User-Agent'), 'Windows'),
     );
 
@@ -72,7 +100,14 @@ $app->get('/download/{version}/composer.phar', function () {
 ->bind('download_version');
 
 $app->get('/schema.json', function () use ($app) {
-    return new Response(file_get_contents($app['composer.doc_dir'].'/../res/composer-schema.json'), 200, ['content-type' => 'application/json']);
+    $cache = new CacheService();
+    
+    // Cache schema content (file rarely changes)
+    $schemaContent = $cache->rememberFile('composer_schema', $app['composer.doc_dir'].'/../res/composer-schema.json', function() use ($app) {
+        return file_get_contents($app['composer.doc_dir'].'/../res/composer-schema.json');
+    }, 86400); // Cache for 24 hours
+    
+    return new Response($schemaContent, 200, ['content-type' => 'application/json']);
 })
 ->bind('schema');
 

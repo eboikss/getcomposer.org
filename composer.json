@@ -1,6 +1,5 @@
 {
     "require": {
-        "composer/composer": "^1.0@dev",
         "erusev/parsedown": "^1.0",
         "monolog/monolog": "^1.4",
         "silex/silex": "^1.1",
@@ -8,7 +7,14 @@
         "symfony/twig-bridge": "^2.3",
         "symfony/finder": "^2.3"
     },
+    "require-dev": {
+        "composer/composer": "^1.0@dev"
+    },
     "autoload": {
         "psr-0": { "": "src/" }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "classmap-authoritative": true
     }
 }

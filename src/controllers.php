@@ -17,16 +17,44 @@ $app->before(function (Request $req) {
     \Tideways\Profiler::setTransactionName($req->getMethod().' '.$actionName);
 }, 8);
 
+/*
+ * Very light in-memory caching wrapper (APCu if available) used to avoid
+ * expensive filesystem scans on every HTTP request. Falls back gracefully if
+ * APCu is not installed or enabled.
+ */
+function cache_result(string $key, callable $callback, int $ttl = 3600)
+{
+    if (function_exists('apcu_fetch')) {
+        $success = false;
+        $value = apcu_fetch($key, $success);
+        if ($success) {
+            return $value;
+        }
+
+        $value = $callback();
+        apcu_store($key, $value, $ttl);
+
+        return $value;
+    }
+
+    // APCu not available ‑ compute value every time
+    return $callback();
+}
+
 $app->get('/', function () use ($app) {
-    $logos = glob(__DIR__.'/../web/img/logo-composer-transparent*.png');
+    $logos = cache_result('homepage.logos', function () {
+        return glob(__DIR__.'/../web/img/logo-composer-transparent*.png');
+    });
     $logo = basename($logos[array_rand($logos)]);
 
-    $versions = array();
-    foreach (glob(__DIR__.'/../web/download/*', GLOB_ONLYDIR) as $version) {
-        $versions[] = basename($version);
-    }
-    usort($versions, 'version_compare');
-    $versions = array_reverse($versions);
+    $versions = cache_result('homepage.versions', function () {
+        $versions = [];
+        foreach (glob(__DIR__.'/../web/download/*', GLOB_ONLYDIR) as $version) {
+            $versions[] = basename($version);
+        }
+        usort($versions, 'version_compare');
+        return array_reverse($versions);
+    }, 600); // cache versions list for 10 minutes as it rarely changes
 
     foreach ($versions as $version) {
         if (strpos($version, '-') === false) {
